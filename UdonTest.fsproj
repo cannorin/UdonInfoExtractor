@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Reference Include="VRC.Udon.Common"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.Common.dll</HintPath></Reference>
+    <Reference Include="VRC.Udon.Compiler"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.Compiler.dll</HintPath></Reference>
+    <Reference Include="VRC.Udon.UAssembly"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.UAssembly.dll</HintPath></Reference>
+    <Reference Include="VRC.Udon.VM"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.VM.dll</HintPath></Reference>
+    <Reference Include="VRC.Udon.Wrapper"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.Wrapper.dll</HintPath></Reference>
+    <Reference Include="VRC.Udon.Security"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.Security.dll</HintPath></Reference>
+    <Reference Include="VRC.Udon.EditorBindings"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.EditorBindings.dll</HintPath></Reference>
+    <Reference Include="VRC.Udon.ClientBindings"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.ClientBindings.dll</HintPath></Reference>
+    <Reference Include="VRC.Udon.Graph"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.Graph.dll</HintPath></Reference>
+  </ItemGroup>
+
+</Project>
