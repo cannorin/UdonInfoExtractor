@@ -1,29 +1,59 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.1</TargetFramework>
+    <UnityInstallRoot>D:\Unity</UnityInstallRoot>
+    <UnityVersion>2018.4.14f1</UnityVersion>
+    <UdonDir>$(MSBuildProjectDirectory)\Assets\Udon</UdonDir>
+    <VRCSDKDir>$(MSBuildProjectDirectory)\Assets\VRCSDK</VRCSDKDir>
   </PropertyGroup>
-
   <ItemGroup>
+    <Compile Include="Sanuki.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
-  
   <ItemGroup>
-    <Reference Include="VRC.Udon.Common"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.Common.dll</HintPath></Reference>
-    <Reference Include="VRC.Udon.Compiler"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.Compiler.dll</HintPath></Reference>
-    <Reference Include="VRC.Udon.UAssembly"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.UAssembly.dll</HintPath></Reference>
-    <Reference Include="VRC.Udon.VM"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.VM.dll</HintPath></Reference>
-    <Reference Include="VRC.Udon.Wrapper"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.Wrapper.dll</HintPath></Reference>
-    <Reference Include="VRC.Udon.Security"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.Security.dll</HintPath></Reference>
-    <Reference Include="VRC.Udon.EditorBindings"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.EditorBindings.dll</HintPath></Reference>
-    <Reference Include="VRC.Udon.ClientBindings"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.ClientBindings.dll</HintPath></Reference>
-    <Reference Include="VRC.Udon.Graph"><HintPath>$(MSBuildProjectDirectory)\Udon\VRC.Udon.Graph.dll</HintPath></Reference>
-  </ItemGroup>
-  
-  <ItemGroup>
+    <PackageReference Include="FParsec" Version="1.0.3" />
     <PackageReference Include="FSharp.Scanf" Version="3.1.3294.2201" />
     <PackageReference Include="FSharpPlus" Version="1.0.0" />
+    <PackageReference Include="Unity3D" Version="1.2.0" />
+    <Reference Include="VRC.Udon.ClientBindings">
+      <HintPath>$(UdonDir)\External\VRC.Udon.ClientBindings.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.Common">
+      <HintPath>$(UdonDir)\External\VRC.Udon.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.Security">
+      <HintPath>$(UdonDir)\External\VRC.Udon.Security.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.VM">
+      <HintPath>$(UdonDir)\External\VRC.Udon.VM.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.Wrapper">
+      <HintPath>$(UdonDir)\External\VRC.Udon.Wrapper.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.Compiler">
+      <HintPath>$(UdonDir)\Editor\External\VRC.Udon.Compiler.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.EditorBindings">
+      <HintPath>$(UdonDir)\Editor\External\VRC.Udon.EditorBindings.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.Graph">
+      <HintPath>$(UdonDir)\Editor\External\VRC.Udon.Graph.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.UAssembly">
+      <HintPath>$(UdonDir)\Editor\External\VRC.Udon.UAssembly.dll</HintPath>
+    </Reference>
+    <Reference Include="VRCSDKBase">
+      <HintPath>$(VRCSDKDir)\Plugins\VRCSDKBase.dll</HintPath>
+    </Reference>
+    <Reference Include="VRCSDK3">
+      <HintPath>$(VRCSDKDir)\Plugins\VRCSDK3.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(UnityInstallRoot)\$(UnityVersion)\$(UnityEnginePath)</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(UnityInstallRoot)\$(UnityVersion)\$(UnityEngineUIPath)</HintPath>
+    </Reference>
   </ItemGroup>
-
 </Project>

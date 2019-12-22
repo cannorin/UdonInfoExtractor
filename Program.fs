@@ -1,73 +1,105 @@
+open System
+open System.Reflection
 open VRC.Udon
 open FSharpPlus
 open FSharp.Scanf
 
-let runTest () =
-  let myWrapper =
-    let print =
-      Common.Delegates.UdonExternDelegate(fun heap stack ->
-        stack.[0] |> heap.GetHeapVariable<obj> |> printfn "My.Print> %A"
-      )
-    { new Common.Interfaces.IUdonWrapperModule with
-        member __.Name = "My"
-        member __.GetExternFunctionParameterCount(signature) =
-          match signature with
-          | "Print" -> 1
-          | _ -> invalidArg "signature" (sprintf "no impl for sig %s" signature)
-        member __.GetExternFunctionDelegate(signature) =
-          match signature with
-          | "Print" -> print
-          | _ -> invalidArg "signature" (sprintf "no impl for sig %s" signature)
-    }
+let myWrapper =
+  let print =
+    Common.Delegates.UdonExternDelegate(fun heap stack ->
+      stack.[0] |> heap.GetHeapVariable<obj> |> printfn "My.Print> %A"
+    )
+  { new Common.Interfaces.IUdonWrapperModule with
+      member __.Name = "My"
+      member __.GetExternFunctionParameterCount(signature) =
+        match signature with
+        | "Print" -> 1
+        | _ -> invalidArg "signature" (sprintf "no impl for sig %s" signature)
+      member __.GetExternFunctionDelegate(signature) =
+        match signature with
+        | "Print" -> print
+        | _ -> invalidArg "signature" (sprintf "no impl for sig %s" signature)
+  }
 
-  let src = """
-  .data_start
-    foo: %SystemInt32, null
-    bar: %SystemString, null
-  .data_end
+let src = """
+.data_start
+  bar: %SystemString, "Hello, \nWorld!\u0061"
+.data_end
 
-  .code_start
-    .export _start
-    _start:
-    PUSH, foo
-    PUSH, bar
-    EXTERN, "SystemConvert.__ToString__SystemInt32__SystemString"
-    PUSH, bar
-    EXTERN, "My.Print"
-    JUMP, 0xFFFFFF
-  .code_end
-  """
+.code_start
+  .export _start
+  _start:
+  JUMP, 30u
+  PUSH, bar
+  EXTERN, "My.Print"
+  PUSH, bar
+  EXTERN, "My.Print"
+  JUMP, 0xFFFFFF
+  print:
+  PUSH, bar
+  EXTERN, "My.Print"
+  JUMP, 0xFFFFFF
+.code_end
+"""
 
-  let asm = UAssembly.Assembler.UAssemblyAssembler()
-  let program = asm.Assemble src
-  let fooAddr = program.SymbolTable.GetAddressFromSymbol "foo"
-  let barAddr = program.SymbolTable.GetAddressFromSymbol "bar"
-  let dwf = Wrapper.UdonDefaultWrapperFactory()
-  dwf.RegisterWrapperModule myWrapper
-  let uvf = VM.UdonVMFactory(dwf)
+let asm = UAssembly.Assembler.UAssemblyAssembler()
+let program = asm.Assemble src
+let dwf = Wrapper.UdonDefaultWrapperFactory()
+dwf.RegisterWrapperModule myWrapper
+let uvf = VM.UdonVMFactory(dwf)
+
+let runVM () =
   let vm = uvf.ConstructUdonVM()
-
   if vm.LoadProgram program then
-    let heap = vm.InspectHeap()
-    heap.SetHeapVariable<int>(fooAddr, 42)
     vm.Interpret() |> ignore
   else
     printfn "fail"
 
-open System.Reflection
+runVM()
 
-type ExternType =
-  | StaticFunc of args:string[] * ret:string
-  | StaticVoidRetFunc of arg:string[]
-  | StaticVoidArgFunc of ret:string
+type UdonType<'t> =
+  | Void
+  | BasicType of 't
+  | Array of UdonType<'t>
+  | Ref of UdonType<'t>
+
+let rec parseTypeName (s: string) =
+  match s with
+  | "SystemVoid" -> Void
+  | Sscanf "%sArray" s | Sscanf "%s[]" s -> Array (parseTypeName s)
+  | Sscanf "%sRef" s -> Ref (parseTypeName s)
+  | s -> BasicType s
+
+let getTypeStringsFromResolver (typeResolver: #UAssembly.Interfaces.IUAssemblyTypeResolver) =
+  let ty = typeResolver.GetType()
+  let types =
+    monad.strict {
+      let! f = ty.GetField("_types", BindingFlags.Static ||| BindingFlags.NonPublic) |> Option.ofObj
+      let dict = f.GetValue() :?> System.Collections.Generic.Dictionary<string, Type>
+      return dict.Keys :> _ seq
+    }
+  defaultArg types Seq.empty
+
+let getTypeStrings () =
+  seq {
+    yield! UAssembly.Assembler.SystemTypeResolver() |> getTypeStringsFromResolver
+    yield! EditorBindings.UdonTypeResolver() |> getTypeStringsFromResolver
+    yield! EditorBindings.VRCSDK2TypeResolver() |> getTypeStringsFromResolver
+    yield! EditorBindings.UnityEngineTypeResolver() |> getTypeStringsFromResolver
+  } |> Seq.map parseTypeName |> Set.ofSeq
+
+type ExternType<'a> =
+  | StaticFunc of args:'a[] * ret:'a
+  | StaticVoidRetFunc of arg:'a[]
+  | StaticVoidArgFunc of ret:'a
   | StaticVoidRetArgFunc
-  | InstanceFunc of args:string[] * ret:string
-  | InstanceVoidRetFunc of arg:string[]
-  | InstanceVoidArgFunc of ty:string
+  | InstanceFunc of args:'a[] * ret:'a
+  | InstanceVoidRetFunc of arg:'a[]
+  | InstanceVoidArgFunc of ty:'a
   | InstanceVoidRetArgFunc
-  | Constructor of args:string[] * ty:string
-  | Unknown of arity:int * argret:string[][]
- 
+  | Constructor of args:'a[] * ty:'a
+  | Unknown of arity:int * argret:'a[][]
+
 let parseSignature (name: string) (argret: string[][]) (arity: int) =
   match name, argret with
   | "ctor", [| xs; [|ret|] |] when xs.Length + 1 = arity -> Constructor (xs, ret)
@@ -120,6 +152,7 @@ let enumerateExterns () =
              |> Seq.toArray
       name,fn,xs,signature,argcount
       )
+
   for moduleName, funcName, xs, orig, arity in types do
     let ty = parseSignature funcName xs arity
     match ty with
@@ -127,4 +160,4 @@ let enumerateExterns () =
     | _ -> () // printfn "%s.%s :: %A, orig = %s.%s" moduleName funcName ty moduleName orig
   types |> Seq.length |> printfn "%i"
 
-enumerateExterns()
+// enumerateExterns()
