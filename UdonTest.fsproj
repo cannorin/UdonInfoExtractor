@@ -8,6 +8,7 @@
     <VRCSDKDir>$(MSBuildProjectDirectory)\Assets\VRCSDK</VRCSDKDir>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Utils.fs" />
     <Compile Include="Sanuki.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
@@ -15,7 +16,10 @@
     <PackageReference Include="FParsec" Version="1.0.3" />
     <PackageReference Include="FSharp.Scanf" Version="3.1.3294.2201" />
     <PackageReference Include="FSharpPlus" Version="1.0.0" />
+    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
+    <!--
     <PackageReference Include="Unity3D" Version="1.2.0" />
+    -->
     <Reference Include="VRC.Udon.ClientBindings">
       <HintPath>$(UdonDir)\External\VRC.Udon.ClientBindings.dll</HintPath>
     </Reference>
@@ -49,11 +53,9 @@
     <Reference Include="VRCSDK3">
       <HintPath>$(VRCSDKDir)\Plugins\VRCSDK3.dll</HintPath>
     </Reference>
-    <Reference Include="UnityEngine">
-      <HintPath>$(UnityInstallRoot)\$(UnityVersion)\$(UnityEnginePath)</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.UI">
-      <HintPath>$(UnityInstallRoot)\$(UnityVersion)\$(UnityEngineUIPath)</HintPath>
-    </Reference>
+    <!--
+    <Reference Include="UnityEngine"><HintPath>$(UnityInstallRoot)\$(UnityVersion)\$(UnityEnginePath)</HintPath></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(UnityInstallRoot)\$(UnityVersion)\$(UnityEngineUIPath)</HintPath></Reference>
+     -->
   </ItemGroup>
 </Project>
