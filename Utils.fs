@@ -100,6 +100,7 @@ module VM =
       foo: %SystemInt32, 42
       bar: %SystemString, "Hello, \nWorld!\u0061"
       piyo: %SystemBoolean, true
+      .sync bar->Foo:
     .data_end
 
     .code_start
@@ -123,6 +124,7 @@ module VM =
     |> Seq.iter (printfn "%i")
     let vm = factory.ConstructUdonVM()
     if vm.LoadProgram program then
+      
       vm.Interpret() |> ignore
     else
       printfn "fail"

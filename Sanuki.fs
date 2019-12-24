@@ -37,22 +37,31 @@ module Ast =
   let (|Info|) x = Info x.info
 
   type Expr<'Label> =
-    | Literal of Literal<'Label>
     | Var of name:string
   type ExprWithInfo<'Label, 'Info> = With<Expr<'Label>, 'Info>
 
+  [<RequireQualifiedAccess>]
+  type VariableSyncType =
+    | None
+    | Itself of interpolationAlgorithmName:string
+    | Property of prop:string * interpolationAlgorithmName:string
+
   type Stmt<'Label, 'Info> =
-    | DefineVar of ty:string * var:string * isPublic:bool * Literal<'Label>
+    | DefineVar of ty:string * var:string * isPublic:bool * sync:VariableSyncType * Literal<'Label>
     | DefineLabel of name:string * isPublic:bool
     | Call of funcName:string * args:ExprWithInfo<'Label, 'Info> list
     | Assign of var:string * ExprWithInfo<'Label, 'Info>
     | Goto of label:string
     | GotoIf of cond:ExprWithInfo<'Label, 'Info> * label:string
     | GotoIndirect of ExprWithInfo<'Label, 'Info>
+    | Push of var:string
+    | Pop
+    | Copy
     | Exit
   and StmtWithInfo<'Label, 'Info> = With<Stmt<'Label, 'Info>, 'Info>
 
-  type ParsedProgram = StmtWithInfo<string, FParsec.Position> list
+  type Program<'info> = StmtWithInfo<string, 'info> list
+  type ParsedProgram = Program<FParsec.Position>
 
 module Parser =
   open FParsec
@@ -80,6 +89,8 @@ module Parser =
     let inline ws1 x = x .>> spaces1
     let inline syn x = skipString x .>> spaces
     let inline syn1 x = skipString x .>> spaces1
+    let inline cyn x = skipChar x .>> spaces
+    let inline cyn1 x = skipChar x .>> spaces1
     let inline pdict (d: seq<_*_>) =
       d |> Seq.map (fun (k, v) -> stringReturn k v) |> choice
     let inline pdictL (d: seq<_*_>) descr =
@@ -113,9 +124,10 @@ module Parser =
 
   let reserved =
     Set.ofList [
-      "let"; "label"; "pub"; "call"; "set"; "exit"
-      "goto"; "goto_if"; "goto_indirect"
-      "this"; "null"
+      "let"; "label"; "pub"; "sync"; "call"; "set"; "exit" // basic keyword
+      "goto"; "goto_if"; "goto_indirect" // goto-like
+      "pop"; "push"; "copy" // unsafe
+      "this"; "null" // literal
     ]
   let inline excludeReserved (i: Parser<string, unit>) : Parser<string, unit> =
     fun stream ->
@@ -131,21 +143,27 @@ module Parser =
   let pStringLiteral = between (skipString "\"") (skipString "\"") (escapedString "\"") |>> StringLiteral
   let pThisLiteral = stringReturn "this" This
   let pNullLiteral = stringReturn "null" Null
-  let pLabel = skipChar '@' >>. pLabelName
+  let pLabel = skipChar '@' >>. pLabelName <?> "label"
   let pLabelLiteral = pLabel |>> Label
   let pLiteral =
     pIntLiteral <|> pFloatLiteral <|> pStringLiteral
                 <|> pThisLiteral  <|> pNullLiteral <|> pLabelLiteral
-  let pLiteralExpr = pLiteral |>> Literal |> withPos
   let pVariableExpr = pVarName |>> Var |> withPos
-  let pExpr = pLiteralExpr <|> pVariableExpr
+  let pExpr = pVariableExpr <?> "variable"
+
+  let pSync =
+    syn "sync" >>. choice [
+      between (cyn '[') (cyn ']') pLabelName
+             .>>. between (cyn '<') (cyn '>') pLabelName |>> VariableSyncType.Property 
+      between (cyn '<') (cyn '>') pLabelName |>> VariableSyncType.Itself
+    ]
 
   let pDefVarStmt =
     pipe3
-      (syn "let" >>. (opt (syn "pub")) .>>. ws pVarName)
+      (syn "let" >>. (opt (syn "pub")) .>>. (opt pSync |>> Option.defaultValue VariableSyncType.None) .>>. ws pVarName)
       (syn ":" >>. ws pVarName)
       (syn "=" >>. ws pLiteral)
-      (fun (b, n) ty v -> DefineVar(ty, n, b.IsSome, v))
+      (fun ((p, s), n) ty v -> DefineVar(ty, n, p.IsSome, s, v))
     |> withPos
   let pDefLabelStmt =
     syn "label" >>. (opt (syn "pub")) .>>. ws pLabel
@@ -162,11 +180,14 @@ module Parser =
       syn "_indirect" >>. ws pExpr |>> GotoIndirect
       spaces >>. ws pLabel |>> Goto
     ] |> withPos
+  let pPushStmt = syn "push" >>. ws pVarName |>> Push |> withPos
+  let pPopStmt  = syn "pop"  >>% Pop |> withPos
+  let pCopyStmt = syn "copy"  >>% Copy |> withPos
   let pExitStmt = syn "exit" >>% Exit |> withPos
 
   let pStmt =
     pDefVarStmt <|> pDefLabelStmt <|> pCallStmt <|> pAssignStmt
-                <|> pGotoStmts <|> pExitStmt
+                <|> pGotoStmts <|> pPushStmt <|> pPopStmt <|> pCopyStmt <|> pExitStmt
 
   let pProgram : Parser<ParsedProgram, _> = spaces >>. manyTill pStmt eof
   
@@ -174,30 +195,63 @@ module Parser =
   let parseFile fileName = runParserOnFile pProgram () fileName System.Text.Encoding.UTF8
 
 let src = """
+let pub sync[Value]<SomeMethod> foo:SystemInt32 = 0
+let sync[Value]<SomeMethod> bar:SystemInt32 = 0
+let sync<SomeMethod> baz:SystemInt32 = 0
 let returnAddr:SystemUInt32=0
 
 label @func
-  call Debug.Log "\"Hello, World!\n\""
+  let msg:SystemString = "\"Hello, World!\n\""
+  call Debug.Log msg
   goto_indirect returnAddr
 
-labelpub @_start
+label pub @_start
   let pub x : SystemBool = null
   goto_if x @next
-  set returnAddr @next
+  let nextAddr:SystemUInt32 = @next
+  set returnAddr nextAddr
   goto @func
   label @next
+  push x
+  push baz
+  copy
+  push x
+  pop
   exit
-
 """
-
-let test() =
-  src |> Parser.parseString "test" |> printfn "%A"
 
 module Compiler =
   type [<Measure>] addr
 
-  type VarTable<'Label> = Map<string, int<addr> * string * bool * Ast.Literal<'Label>>
+  type VarTable<'Label> = Map<string, int<addr> * string * bool * Ast.VariableSyncType * Ast.Literal<'Label>>
   type LabelTable = Map<string, int<addr> * bool>
+
+  type CompileResult<'a, 'warn, 'error> =
+    | COk of 'a * 'warn list
+    | CError of 'warn list * 'error list
+    static member inline Return x = COk (x, [])
+    static member inline ( >>= ) (x: CompileResult<'a, 'w, 'e>, f: 'a -> CompileResult<'b, 'w, 'e>) : CompileResult<'b, 'w, 'e> =
+      match x with
+      | CError (ws, es) -> CError (ws, es)
+      | COk (x, ws) ->
+        match f x with
+        | COk (y, ws') -> COk (y, ws @ ws')
+        | CError (ws', es) -> CError (ws @ ws', es)
+  module CompileResult =
+    let inline returnError e = CError ([], [e])
+    let inline addWarn w x =
+      match x with COk (x, ws) -> COk (x, w :: ws) | CError (ws, es) -> CError (w :: ws, es)
+    let inline mapWarn f x =
+      match x with COk (x, ws) -> COk (x, List.map f ws) | CError (ws, es) -> CError (List.map f ws, es)
+    let inline mapError f x =
+      match x with COk (x, ws) -> COk (x, ws) | CError (ws, es) -> CError (ws, List.map f es)
+  open CompileResult
+
+  type CompilerMsg<'info> = CompilerMsg of 'info * msg:string with
+    static member inline Map (CompilerMsg (i, m), f) = CompilerMsg (f i, m)
+
+  type CompileMsgResult<'a, 'info> =
+    CompileResult<'a, CompilerMsg<'info>, CompilerMsg<'info>>
   
   [<RequireQualifiedAccess>]
   type Op =
@@ -223,8 +277,9 @@ module Compiler =
     | Extern of string
     | Copy
     | Exit
+  type AbstractOps<'info> = Ast.With<AbstractOp, 'info> list
 
-  module ParsedProgram =
+  module Program =
     open Ast
 
     // type Stmt<'Label, 'Info> =
@@ -236,7 +291,7 @@ module Compiler =
     //   | GotoIf of cond:ExprWithInfo<'Label, 'Info> * label:string
     //   | GotoIndirect of ExprWithInfo<'Label, 'Info>
     //   | Exit
-    let toAbstractOp (p: ParsedProgram) : VarTable<string> * AbstractOp list =
+    let toAbstractOp (externArity: Map<string, int>) (p: Program<'info>) : CompileMsgResult<VarTable<string> * AbstractOps<'info>, 'info> =
       let gensym =
         let c = ref 0<addr>
         fun () ->
@@ -253,26 +308,68 @@ module Compiler =
         | _, (This | Null) -> true
         | _ -> false
 
-      let requestLiteralVar =
-        let mutable mapping : Map<string * Literal<_>, int> = Map.empty
-        // TODO
-        ()
-
-      let rec go (vt: VarTable<string>) acc = function
-        | [] -> vt, acc
+      let rec go (ops: Program<_>) (vt: VarTable<string>, lt: Set<string>, acc) =
+        match ops with
+        | [] -> result (vt, acc)
         | With (x, pos) :: rest ->
-          let vt, ops =
+          let result =
             match x with
-            | DefineVar (ty, var, p, l) ->
-              vt |> Map.add var (gensym(), ty, p, l), []
-            | DefineLabel (n, p) -> vt, [AbstractOp.Label (n, p)]
-            | Assign (v, l) ->
-              match l with
-              | Item (Var u) -> vt, [AbstractOp.Push u; AbstractOp.Push v; AbstractOp.Copy]
-            | Goto l -> vt, [AbstractOp.Jump l]
-            | Exit -> vt, [AbstractOp.Exit]
-          go vt (acc @ ops) rest
-      go Map.empty [] p
+            | DefineVar (ty, var, p, s, l) ->
+              if vt |> Map.containsKey var then
+                CompilerMsg (pos, sprintf "variable %s is defined twice" var) |> returnError
+              else if checkLiteralType ty l then
+                result (vt |> Map.add var (gensym(), ty, p, s, l), lt, [])
+              else
+                CompilerMsg (pos, sprintf "this literal cannot be used to type %s." ty) |> returnError
+            | DefineLabel (n, p) ->
+              if lt |> Set.contains n |> not then
+                result (vt, lt |> Set.add n, [AbstractOp.Label (n, p)])
+              else
+                CompilerMsg (pos, sprintf "label %s is defined twice" n) |> returnError
+            | Call (fn, args) ->
+              let ops = [
+                for Item(Var v) in args do
+                  yield AbstractOp.Push v
+                yield AbstractOp.Extern fn
+              ]
+              let res = result (vt, lt, ops)
+              match externArity |> Map.tryFind fn with
+              | None -> res
+              | Some i ->
+                let len = List.length args
+                if len = i then res
+                else
+                  res |> addWarn (CompilerMsg (pos, sprintf "extern %s has an arity %i but given only %i arg(s). this will only push the last %i arg(s)." fn i len len))
+            | Assign (v, With(Var u, ePos)) ->
+              match Map.tryFind v vt, Map.tryFind u vt with
+              | Some (_, vTy, _, _, _), Some (_, uTy, _, _, _) ->
+                if vTy = uTy then
+                  result (vt, lt, [AbstractOp.Push u; AbstractOp.Push v; AbstractOp.Copy])
+                else
+                  CompilerMsg (pos, sprintf "type mismatch. %s:%s != %s:%s." v vTy u uTy) |> returnError
+              | Some _, None -> CompilerMsg (ePos, sprintf "variable %s not defined" u) |> returnError
+              | None, _ -> CompilerMsg (pos, sprintf "variable %s not defined" v) |> returnError
+            | Goto l -> result (vt, lt, [AbstractOp.Jump l])
+            | GotoIf (With (Var v, ePos), l) ->
+              match Map.tryFind v vt with
+              | Some (_, "SystemBool", _, _, _) ->
+                result (vt, lt, [AbstractOp.Push v; AbstractOp.JumpIf l])
+              | Some (_, ty, _, _, _) ->
+                CompilerMsg (ePos, sprintf "type %s is not SystemBoolean." ty) |> returnError
+              | None -> CompilerMsg (pos, sprintf "variable %s not defined" v) |> returnError
+            | GotoIndirect (With (Var v, ePos)) ->
+              match Map.tryFind v vt with
+              | Some (_, "SystemUInt32", _, _, _) ->
+                result (vt, lt, [AbstractOp.JumpIndirect v])
+              | Some (_, ty, _, _, _) ->
+                CompilerMsg (ePos, sprintf "type %s is not SystemUInt32." ty) |> returnError
+              | None -> CompilerMsg (pos, sprintf "variable %s not defined" v) |> returnError
+            | Push v -> result (vt, lt, [AbstractOp.Push v]) |> addWarn (CompilerMsg (pos, "push is unsafe. use it with care."))
+            | Pop    -> result (vt, lt, [AbstractOp.Pop]) |> addWarn (CompilerMsg (pos, "pop is unsafe. use it with care."))
+            | Copy   -> result (vt, lt, [AbstractOp.Copy]) |> addWarn (CompilerMsg (pos, "copy is unsafe. use it with care."))
+            | Exit -> result (vt, lt, [AbstractOp.Exit])
+          result >>= fun (vt, lt, ops) -> go rest (vt, lt, acc @ (ops |> List.map (With.info pos)))
+      go p (Map.empty, Set.empty, [])
 
   module AbstractOp =
     let length (op: AbstractOp) =
@@ -281,27 +378,33 @@ module Compiler =
       | Nop | Pop | Copy -> 1<addr>
       | Push _ | Jump _ | JumpIf _| JumpIndirect _ | Extern _ | Exit -> 5<addr>
 
-    let getLabelAddress label ops =
+    let getLabelAddress info label ops =
       let rec go len ops =
         match ops with
-        | Label (l, _) :: _ when l = label -> len
-        | op :: ops -> go (len + length op) ops
-        | [] -> failwith "label '%s' does not exist"
+        | Ast.Item (Label (l, _)) :: _ when l = label -> result len
+        | Ast.Item op :: ops -> go (len + length op) ops
+        | [] -> CompilerMsg(info, "label '%s' is not defined") |> returnError
       go 0<addr> ops
 
-    let createLabelTable ops : LabelTable =
-      ops |> List.choose (function Label (l, p) -> Some (l, p) | _ -> None)
-          |> List.groupBy id
-          |> List.map (function ((l, p), [_]) -> l, (getLabelAddress l ops, p)
-                              | ((l, _), _) -> failwithf "label '%s' is defined twice" l)
-          |> Map.ofList
-
+    let createLabelTable (ops: AbstractOps<_>) : CompileMsgResult<LabelTable, _> =
+      ops |> List.choose (function Ast.With(Label (l, p), info) -> Some ((l, p), info) | _ -> None)
+          |> List.groupBy fst
+          |> List.map (function ((l, p), [(_,info)]) -> getLabelAddress info l ops |> map (fun x -> l,(x,p))
+                              | _, [] -> failwith "impossible"
+                              | (l, _), xs ->
+                                CompilerMsg((List.last xs |> snd), sprintf "label %s is defined twice" l)
+                                |> returnError)
+          |> List.fold (fun state x ->
+              state >>= fun t ->
+                x >>= fun (k, v) ->
+                  t |> Map.add k v |> result
+            ) (result Map.empty)
+          
     let replaceLabelsInVarTable (labelTable: LabelTable) (varTable: VarTable<string>) : VarTable<int<addr>> =
-      varTable |> Map.map (fun _ (addr, ty, pub, l) ->
-        (addr, ty, pub, l |> map (fun x -> labelTable |> Map.find x |> fst)))
+      varTable |> Map.map (fun _ (addr, ty, pub, sync, l) ->
+        (addr, ty, pub, sync, l |> map (fun x -> labelTable |> Map.find x |> fst)))
 
-    let toOp (varTable: VarTable<int<addr>>) ops : Op list =
-      let labelTable = createLabelTable ops
+    let toOp (labelTable: LabelTable) (varTable: VarTable<int<addr>>) (ops: AbstractOps<_>) : Op list =
       let rec f = function
         | [] -> []
         | Nop :: xs -> Op.Nop :: f xs
@@ -314,4 +417,26 @@ module Compiler =
         | Extern s :: xs -> Op.Extern s :: f xs
         | Copy :: xs -> Op.Copy :: f xs
         | Exit :: xs -> Op.Jump 0xFFFFFF<addr> :: f xs
-      f ops
+      f (ops |> List.map (fun x -> x.item))
+
+  let compile (p: Ast.Program<'a>) : CompileMsgResult<Assembly, 'a> =
+    Program.toAbstractOp Map.empty p 
+    >>= fun (vt, aops) ->
+      AbstractOp.createLabelTable aops
+      >>= fun lt ->
+        let vt = AbstractOp.replaceLabelsInVarTable lt vt
+        (vt, AbstractOp.toOp lt vt aops) |> result
+
+open FParsec
+open Compiler
+
+let test() =
+  match src |> Parser.parseString "test" with
+  | Success (x, _, _) ->
+    match x |> compile with
+    | CError _  as e -> printfn "%A" e
+    | COk (x, _) as o ->
+      printfn "%A" o
+      
+
+  | Failure (msg, _, _) -> printfn "error: %s" msg

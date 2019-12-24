@@ -1,5 +1,5 @@
 ﻿module Program
 
-Utils.VM.test()
+// Utils.VM.test()
 
-// Sanuki.test()
+Sanuki.test()
