@@ -1,5 +1,6 @@
 module Utils
 
+open UdonBase
 open System
 open System.Reflection
 open VRC.Udon
@@ -95,36 +96,32 @@ module VM =
 
   let test () =
     let src = """
-    .data_start
-      baz: %SystemUInt32, 0
-      foo: %SystemInt32, 42
-      bar: %SystemString, "Hello, \nWorld!\u0061"
-      piyo: %SystemBoolean, true
-      .sync bar->Foo:
-    .data_end
-
-    .code_start
-      .export _start
-      _start:
-      JUMP, 30u
-      PUSH, bar
-      EXTERN, "Debug.Log"
-      PUSH, bar
-      EXTERN, "Debug.Log"
-      JUMP, 0xFFFFFF
-      print:
-      PUSH, bar
-      EXTERN, "Debug.Log"
-      JUMP, 0xFFFFFF
-    .code_end
+.data_start
+    # Address: 0x0
+    foo: %SystemInt32, 2
+    # Address: 0x1
+    bar: %SystemInt32, 3
+    # Address: 0x2
+    baz: %SystemInt32, 4
+    # Address: 0x3
+    res: %SystemInt32, 0
+.data_end
+.code_start
+    PUSH, 0x0
+    PUSH, 0x1
+    PUSH, 0x2
+    PUSH, 0x3
+    EXTERN, "SystemInt32.__op_Addition__SystemInt32_SystemInt32__SystemInt32"
+    PUSH, 0x3
+    PUSH, 0x3
+    EXTERN, "SystemInt32.__op_Multiplication__SystemInt32_SystemInt32__SystemInt32"
+    PUSH, 0x3
+    EXTERN, "Debug.Log"
+.code_end
     """
     let program = assembler.Assemble src
-    program.SymbolTable.GetSymbols()
-    |> Seq.map (program.SymbolTable.GetAddressFromSymbol)
-    |> Seq.iter (printfn "%i")
     let vm = factory.ConstructUdonVM()
     if vm.LoadProgram program then
-      
       vm.Interpret() |> ignore
     else
       printfn "fail"
@@ -133,7 +130,6 @@ type UdonType<'t> =
   | Void
   | TypeParam of string
   | BasicType of 't
-  | Array of UdonType<'t>
   | Ref of UdonType<'t>
 
 module UdonType =
@@ -141,7 +137,6 @@ module UdonType =
     match s with
     | "SystemVoid" -> Void
     | "T" -> TypeParam "T"
-    | Sscanf "%sArray" s | Sscanf "%s[]" s -> Array (parse s)
     | Sscanf "%sRef" s -> Ref (parse s)
     | s -> BasicType s
 
@@ -163,50 +158,8 @@ module UdonType =
       yield! EditorBindings.UnityEngineTypeResolver() |> getAllFromResolver
     } |> Set.ofSeq
 
-type ExternType<'a> =
-  | StaticFunc of args:'a[] * ret:'a option
-  | StaticGenericFunc of typrm:string list * args:'a[] * ret:'a option
-  | InstanceFunc of args:'a[] * ret:'a option
-  | InstanceGenericFunc of typrm:string list * args:'a[] * ret:'a option
-  | Constructor of args:'a[] * ty:'a
-  | Unknown of arity:int * argret:'a[][]
-
 module ExternType =
-  let parseSignature (name: string) (argret: string[][]) (arity: int) =
-    let StaticVoidRetArgFunc = StaticFunc (Array.empty, None)
-    let inline StaticVoidRetFunc xs = StaticFunc (xs, None)
-    let inline StaticVoidArgFunc x  = StaticFunc (Array.empty, Some x)
-    let InstanceVoidRetArgFunc = InstanceFunc (Array.empty, None)
-    let inline InstanceVoidRetFunc xs = InstanceFunc (xs, None)
-    let inline InstanceVoidArgFunc x  = InstanceFunc (Array.empty, Some x)
-
-    match name, argret with
-    | "ctor", [| xs; [|ret|] |] when xs.Length + 1 = arity -> Constructor (xs, ret)
-    | _, [|[|"SystemVoid"|]|] ->
-      if arity = 0 then StaticVoidRetArgFunc
-      else if arity = 1 then InstanceVoidRetArgFunc
-      else Unknown (arity, argret)
-    | _, [|[|("T" | "TArray") as ret|]|] ->
-      if arity = 2 then StaticGenericFunc(["T"], [||], Some ret)
-      else if arity = 3 then InstanceGenericFunc(["T"], [||], Some ret)
-      else Unknown (arity, argret)
-    | _, [|[|ret|]|] ->
-      if arity = 1 then StaticVoidArgFunc ret
-      else if arity = 2 then InstanceVoidArgFunc ret
-      else Unknown (arity, argret)
-    | _, [| args; [|"SystemVoid"|] |] ->
-      if arity = args.Length then StaticVoidRetFunc args
-      else if arity = args.Length + 1 then InstanceVoidRetFunc args
-      else Unknown (arity, argret)
-    | _, [| args; [| ("T" | "TArray") as ret |] |] ->
-      if arity = args.Length + 2 then StaticGenericFunc (["T"], args, Some ret)
-      else if arity = args.Length + 3 then InstanceGenericFunc (["T"], args, Some ret)
-      else Unknown (arity, argret)
-    | _, [| args; [|ret|] |] ->
-      if arity = args.Length + 1 then StaticFunc (args, Some ret)
-      else if arity = args.Length + 2 then InstanceFunc (args, Some ret)
-      else Unknown (arity, argret)
-    | _ -> Unknown (arity, argret)
+  open ExternType
 
   let enumerateDefined () =
     let asm = (typeof<Wrapper.UdonWrapper>).Assembly
@@ -224,7 +177,7 @@ module ExternType =
     |> Seq.map (fun (pc, ctor) ->
       let instance = ctor.Invoke([||])
       let name = name.GetValue(instance) :?> string
-      let dict = pc.GetValue() :?> System.Collections.Generic.Dictionary<string, int>
+      let dict = pc.GetValue() :?> Collections.Generic.Dictionary<string, int>
       dict |> Seq.map (function KeyValue(k, v) -> name,k,v)
       )
     |> Seq.concat
@@ -246,4 +199,30 @@ let doEnumerateExterns () =
     match ty with
     | Unknown _ -> printfn "%s.%s: Unknown, arity = %i, orig = %s.%s" moduleName funcName arity moduleName orig
     | _ -> printfn "%s.%s :: %A, orig = %s.%s" moduleName funcName ty moduleName orig
+
+open Trie
+
+let createExternMap () =
+  ExternType.enumerateDefined ()
+  |> Seq.groupBy (fun (m,f,_,_,_) -> m,f)
+  |> Seq.map (fun ((m, f), xs) ->
+    sprintf "%s.%s" m f,
+    xs |> Seq.map (fun (_,_,ty,_,orig) -> { Namespace = m; Name = f; Type = ty; Signature = orig })
+       |> Seq.toArray)
+  |> StringTrie.ofSeq
+
+open Thoth.Json.Net
+
+let charCoder =
+  Extra.empty
+  |> Extra.withCustom
+    (string >> Encode.string)
+    (fun str obj ->
+      Decode.string str obj
+      |> Result.bind (fun s ->
+        if s.Length = 1 then Ok s.[0]
+        else Error (DecoderError("not a char", FailMessage "not a char"))))
+
+let createExternMapJson () =
+  Encode.Auto.toString(0, createExternMap () |> StringTrie.toArray, extra=charCoder, skipNullField=true)
 

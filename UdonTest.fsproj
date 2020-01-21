@@ -8,8 +8,12 @@
     <VRCSDKDir>$(MSBuildProjectDirectory)\Assets\VRCSDK</VRCSDKDir>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Trie.fs" />
+    <Compile Include="UdonBase.fs" />
     <Compile Include="Utils.fs" />
+    <Compile Include="Parsec.fs" />
     <Compile Include="Sanuki.fs" />
+    <Compile Include="JustML.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
@@ -17,6 +21,7 @@
     <PackageReference Include="FSharp.Scanf" Version="3.1.3294.2201" />
     <PackageReference Include="FSharpPlus" Version="1.0.0" />
     <PackageReference Include="System.ValueTuple" Version="4.5.0" />
+    <PackageReference Include="Thoth.Json.Net" Version="3.6.0" />
     <!--
     <PackageReference Include="Unity3D" Version="1.2.0" />
     -->
