@@ -146,7 +146,7 @@ module UdonType =
       monad.strict {
         let! f = ty.GetField("_types", BindingFlags.Static ||| BindingFlags.NonPublic) |> Option.ofObj
         let dict = f.GetValue() :?> System.Collections.Generic.Dictionary<string, Type>
-        return dict.Keys :> _ seq |> Seq.map parse
+        return dict |> Seq.map (function KeyValue (k, v) -> (k, v))
       }
     defaultArg types Seq.empty
 
@@ -156,7 +156,39 @@ module UdonType =
       yield! EditorBindings.UdonTypeResolver() |> getAllFromResolver
       yield! EditorBindings.VRCSDK2TypeResolver() |> getAllFromResolver
       yield! EditorBindings.UnityEngineTypeResolver() |> getAllFromResolver
-    } |> Set.ofSeq
+    } |> Seq.cache
+
+  let createTyperMap (xs: seq<string * Type>) : UdonTypeContext<string> =
+    let xs = Array.ofSeq xs
+    let revMap = xs |> Seq.map (fun (name, ty) -> ty.FullName, name) |> Map.ofSeq
+    let rec findNearestBaseType (ty: Type) =
+      let bt = ty.BaseType
+      if isNull bt then None
+      else
+        match revMap |> Map.tryFind bt.FullName with
+        | None -> findNearestBaseType bt
+        | Some t -> Some t
+    Map.ofSeq <| seq {
+      for name, ty in xs do
+        let atys =
+          xs |> Seq.filter (fun (_, ty2) -> ty2.IsAssignableFrom ty)
+             |> Seq.map fst |> Seq.toArray
+        let prms =
+          ty.GenericTypeArguments
+          |> Seq.map (fun t -> t.FullName)
+          |> Seq.choose (fun n -> revMap |> Map.tryFind n)
+          |> Seq.toArray
+        name,
+        {
+          Type = name; ActualType = ty.FullName
+          IsAbstract = ty.IsAbstract; IsInterface = ty.IsInterface
+          IsClass = ty.IsClass; IsValueType = ty.IsValueType
+          IsPrimitive = ty.IsPrimitive; IsArray = ty.IsArray;
+          IsGenericType = ty.IsGenericType
+          BaseType = findNearestBaseType ty
+          GenericTypeArguments = prms; AssignableTo = atys
+        }
+    }
 
 module ExternType =
   open ExternType
