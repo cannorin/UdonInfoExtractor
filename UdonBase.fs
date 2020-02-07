@@ -64,6 +64,7 @@ type UdonTypeInfo<'a> = {
   IsInterface: bool
   IsClass: bool
   IsValueType: bool
+  IsEnum: bool
   IsPrimitive: bool
   IsArray: bool;
   IsGenericType: bool

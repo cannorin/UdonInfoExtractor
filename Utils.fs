@@ -26,7 +26,7 @@ module UdonType =
     } |> Seq.cache
 
   let createTyperMap (xs: seq<string * Type>) : UdonTypeContext<string> =
-    let xs = Array.ofSeq xs
+    let xs = xs |> Seq.filter (fst >> String.endsWith "Ref" >> not) |> Seq.distinctBy fst
     let revMap = xs |> Seq.map (fun (name, ty) -> ty.FullName, name) |> Map.ofSeq
     let rec findNearestBaseType (ty: Type) =
       let bt = ty.BaseType
@@ -50,6 +50,7 @@ module UdonType =
           Type = name; ActualType = ty.FullName
           IsAbstract = ty.IsAbstract; IsInterface = ty.IsInterface
           IsClass = ty.IsClass; IsValueType = ty.IsValueType
+          IsEnum = ty.IsEnum
           IsPrimitive = ty.IsPrimitive; IsArray = ty.IsArray;
           IsGenericType = ty.IsGenericType
           BaseType = findNearestBaseType ty
