@@ -35,7 +35,12 @@ let main argv =
     else
       let dirName = Path.GetFullPath argv.[0]
       if Directory.Exists dirName then dirName
-      else failwithf "error: directory '%s' does not exist" argv.[0]
+      else
+        try
+          Directory.CreateDirectory dirName |> ignore
+          dirName
+        with
+         | _ -> failwithf "error: directory '%s' does not exist" argv.[0]
   
   let write fileName json =
     let path = Path.Combine(targetDir, fileName)
