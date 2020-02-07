@@ -77,5 +77,7 @@ type UdonTypeContext<'a when 'a: comparison> = Map<'a, UdonTypeInfo<'a>>
 
 type UdonInfo = {
   Externs: (string * ExternInfo<string>[]) []
-  Types:  UdonTypeContext<string>
+  Types:   UdonTypeContext<string>
+  UDONSDKVersion: string
+  VRCSDK3Version: string
 }

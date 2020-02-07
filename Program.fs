@@ -15,13 +15,16 @@ let charCoder =
         if s.Length = 1 then Ok s.[0]
         else Error (DecoderError("not a char", FailMessage "not a char"))))
 
+let vrcsdk3Version = "2020.02.03.22.36"
+let udonsdkVersion = "2020.02.03.11.56"
+
 [<EntryPoint>]
 let main argv =
   let externs = Extern.createExternMap ()
   let types =
     let xs = UdonType.getAllSupported ()
     UdonType.createTyperMap xs
-  let info = { Externs = externs; Types = types }
+  let info = { Externs = externs; Types = types; VRCSDK3Version = vrcsdk3Version; UDONSDKVersion = udonsdkVersion }
 
   let encode x =
     Encode.Auto.toString(0, x, extra=charCoder, skipNullField=true)
