@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <UnityInstallRoot>D:\Unity</UnityInstallRoot>
+    <UnityVersion>2018.4.14f1</UnityVersion>
+    <UdonDir>$(MSBuildProjectDirectory)\Assets\Udon</UdonDir>
+    <VRCSDKDir>$(MSBuildProjectDirectory)\Assets\VRCSDK</VRCSDKDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="UdonBase.fs" />
+    <Compile Include="Utils.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FSharpPlus" Version="1.0.0" />
+    <PackageReference Include="System.ValueTuple" Version="4.5.0" />
+    <PackageReference Include="Thoth.Json.Net" Version="3.6.0" />
+    <PackageReference Include="Unity3D" Version="1.2.0" />
+    <Reference Include="VRC.Udon.ClientBindings">
+      <HintPath>$(UdonDir)\External\VRC.Udon.ClientBindings.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.Common">
+      <HintPath>$(UdonDir)\External\VRC.Udon.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.Security">
+      <HintPath>$(UdonDir)\External\VRC.Udon.Security.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.VM">
+      <HintPath>$(UdonDir)\External\VRC.Udon.VM.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.Wrapper">
+      <HintPath>$(UdonDir)\External\VRC.Udon.Wrapper.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.Compiler">
+      <HintPath>$(UdonDir)\Editor\External\VRC.Udon.Compiler.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.EditorBindings">
+      <HintPath>$(UdonDir)\Editor\External\VRC.Udon.EditorBindings.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.Graph">
+      <HintPath>$(UdonDir)\Editor\External\VRC.Udon.Graph.dll</HintPath>
+    </Reference>
+    <Reference Include="VRC.Udon.UAssembly">
+      <HintPath>$(UdonDir)\Editor\External\VRC.Udon.UAssembly.dll</HintPath>
+    </Reference>
+    <Reference Include="VRCSDKBase">
+      <HintPath>$(VRCSDKDir)\Plugins\VRCSDKBase.dll</HintPath>
+    </Reference>
+    <Reference Include="VRCSDK3">
+      <HintPath>$(VRCSDKDir)\Plugins\VRCSDK3.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine"><HintPath>$(UnityInstallRoot)\$(UnityVersion)\$(UnityEnginePath)</HintPath></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(UnityInstallRoot)\$(UnityVersion)\$(UnityEngineUIPath)</HintPath></Reference>
+  </ItemGroup>
+</Project>
