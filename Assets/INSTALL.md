@@ -2,6 +2,7 @@ This directory should contain the `Udon` and `VRCSDK` folder.
 
 The following DLLs are referenced from the project:
 
+```
 ├── Udon
 │   ├── Editor
 │   │   └── External
@@ -19,3 +20,4 @@ The following DLLs are referenced from the project:
     └─ Plugins
         ├── VRCSDK3.dll
         └── VRCSDKBase.dll
+```
