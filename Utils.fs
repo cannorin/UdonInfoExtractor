@@ -61,6 +61,16 @@ module UdonType =
 module Extern =
   open ExternType
 
+  let parse signature arity =
+    let fn, xs =
+      match signature |> String.split ["__"] |> Seq.filter ((<>) "") |> Seq.toList with
+      | [] -> failwith "impossible"
+      | x :: xs ->
+        x, 
+        xs |> Seq.map (fun x -> x.Split '_')
+           |> Seq.toArray
+    fn, parseSignature fn xs arity
+
   let enumerateDefined () =
     let asm = (typeof<Wrapper.UdonWrapper>).Assembly
     let wrapperTy = typeof<Common.Interfaces.IUdonWrapperModule>
@@ -82,14 +92,8 @@ module Extern =
       )
     |> Seq.concat
     |> Seq.map (fun (name, signature, argcount) ->
-      let fn, xs =
-        match signature |> String.split ["__"] |> Seq.filter ((<>) "") |> Seq.toList with
-        | [] -> failwith "impossible"
-        | x :: xs ->
-          x, 
-          xs |> Seq.map (fun x -> x.Split '_')
-             |> Seq.toArray
-      name,fn,parseSignature fn xs argcount, argcount,signature
+      let fn, et = parse signature argcount
+      name, fn, et, argcount, signature
       )
 
   let createExternMap () =
@@ -97,6 +101,35 @@ module Extern =
     |> Seq.groupBy (fun (m,f,_,_,_) -> m,f)
     |> Seq.map (fun ((m, f), xs) ->
       sprintf "%s.%s" m f,
-      xs |> Seq.map (fun (_,_,ty,_,orig) -> { Namespace = m; Name = f; Type = ty; Signature = orig })
+      xs |> Seq.map (fun (_,_,ty,_,orig) -> {| Namespace = m; Name = f; Type = ty; Signature = orig |})
          |> Seq.toArray)
     |> Seq.toArray
+
+module GraphNode =
+  open VRC.Udon.Graph
+
+  let enumerateAllNodeDefinitions () : UdonNodeDefinition seq =
+    let asm = (typeof<UdonNodeDefinition>).Assembly
+    let baseTy = typeof<BaseNodeRegistry>
+    asm.GetTypes()
+    |> Seq.filter (fun t -> t.IsSubclassOf baseTy && not t.IsAbstract)
+    |> Seq.choose (fun t -> t.GetConstructor([||]) |> Option.ofObj)
+    |> Seq.collect (fun ctor ->
+      let instance = ctor.Invoke [||] :?> BaseNodeRegistry
+      instance.GetNodeDefinitions()
+    )
+
+  let getExternDefinition (und: UdonNodeDefinition) (tyCtx: UdonTypeContext<string>) : UdonExternDefinition<string> option =
+    match und.fullName.Split '.' with
+    | [| ns; signature |] ->
+      let name, et = Extern.parse signature und.parameters.Count
+      let name =
+        match und.name |> String.split [" "] |> Seq.tryFind (fun s -> s.StartsWith name && signature.Contains s) with
+        | Some name -> name
+        | _ -> name
+      let et =
+        match et with
+        | Unknown _ -> failwith "TODO"
+        | _ -> et
+      failwith "TODO"
+    | _ -> None

@@ -52,10 +52,33 @@ module ExternType =
       else Unknown (arity, argret)
     | _ -> Unknown (arity, argret)
 
-type ExternInfo<'a> = { Namespace: string; Name:string; Type: ExternType<'a>; Signature: string }
+type ExternInfo<'a> = {| Namespace: string; Name:string; Type: ExternType<'a>; Signature: string |}
 module ExternInfo =
-  let map f info =
-    { Namespace = info.Namespace; Name = info.Name; Signature = info.Signature; Type = ExternType.map f info.Type }
+  let map f (info: ExternInfo<_>) : ExternInfo<_> =
+    {| Namespace = info.Namespace; Name = info.Name; Signature = info.Signature; Type = ExternType.map f info.Type |}
+
+type UdonExternParameterType<'a> =
+  | In of 'a
+  | Out of 'a
+  | InOut of 'a
+  | TypeParameter of string
+
+type UdonExternParameterInfo<'a> = {
+  Name: string option
+  Type: UdonExternParameterType<'a>
+}
+
+type UdonExternDefinition<'a> = {|
+  Namespace: string
+  Name: string
+  Signature: string
+  Type: ExternType<'a>
+  FullName: string
+  IsStatic: bool
+  ReturnType: 'a option
+  TypeParameters: string[]
+  Parameters: UdonExternParameterInfo<'a>[]
+|}
 
 type UdonTypeInfo<'a> = {
   Type: 'a
@@ -75,9 +98,13 @@ type UdonTypeInfo<'a> = {
 
 type UdonTypeContext<'a when 'a: comparison> = Map<'a, UdonTypeInfo<'a>>
 
-type UdonInfo = {
-  Externs: (string * ExternInfo<string>[]) []
+type UdonInfo<'Extern> = {
+  Externs: (string * 'Extern[]) []
   Types:   UdonTypeContext<string>
   UDONSDKVersion: string
   VRCSDK3Version: string
 }
+
+type UdonInfo_Before20200223 = UdonInfo<ExternInfo<string>>
+
+type UdonInfo_Current = UdonInfo<UdonExternDefinition<string>>
