@@ -20,9 +20,10 @@ let udonsdkVersion = vrcsdk3Version
 
 [<EntryPoint>]
 let main argv =
-
   let types =
-    let xs = UdonType.getAllSupported ()
+    let xs =
+      Seq.append (UdonType.getAllSupported ()) (UdonType.getAllFromNodeRegistry ())
+      |> Seq.distinctBy fst
     UdonType.createTyperMap xs
 
   // let externs = Extern.createExternMap ()

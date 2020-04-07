@@ -21,6 +21,15 @@ module Misc =
     Printf.kprintf (fun s -> use __ = ccl color in printfn "%s" s) format
 
 module UdonType =
+  open VRC.Udon.Graph
+  let getAllFromNodeRegistry () =
+    let node = new UdonTypeNodeRegistry()
+    node.GetNodeDefinitions()
+    |> Seq.choose (fun d ->
+      if not <| d.fullName.StartsWith "Type_" then
+        None
+      else Some (d.fullName.[5..], d.``type``))
+
   let getAllFromResolver (typeResolver: #UAssembly.Interfaces.IUAssemblyTypeResolver) =
     let ty = typeResolver.GetType()
     let types =
