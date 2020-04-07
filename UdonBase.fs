@@ -57,29 +57,6 @@ module ExternInfo =
   let map f (info: ExternInfo<_>) : ExternInfo<_> =
     {| Namespace = info.Namespace; Name = info.Name; Signature = info.Signature; Type = ExternType.map f info.Type |}
 
-type UdonExternParameterType<'a> =
-  | In of 'a
-  | Out of 'a
-  | InOut of 'a
-  | TypeParameter of string
-
-type UdonExternParameterInfo<'a> = {
-  Name: string option
-  Type: UdonExternParameterType<'a>
-}
-
-type UdonExternDefinition<'a> = {|
-  Namespace: string
-  Name: string
-  Signature: string
-  Type: ExternType<'a>
-  FullName: string
-  IsStatic: bool
-  ReturnType: 'a option
-  TypeParameters: string[]
-  Parameters: UdonExternParameterInfo<'a>[]
-|}
-
 type UdonTypeInfo<'a> = {
   Type: 'a
   ActualType: string
@@ -97,6 +74,29 @@ type UdonTypeInfo<'a> = {
 }
 
 type UdonTypeContext<'a when 'a: comparison> = Map<'a, UdonTypeInfo<'a>>
+type UdonExternParameterType<'a> =
+  | In of 'a
+  | Out of 'a
+  | InOut of 'a
+  | TypeParameter of string
+  | UsesUnknownType of UdonExternParameterType<UdonTypeInfo<'a>>
+
+type UdonExternParameterInfo<'a> = {
+  Name: string option
+  Type: UdonExternParameterType<'a>
+}
+
+type UdonExternDefinition<'a> = {|
+  Namespace: string
+  Name: string
+  Signature: string
+  Type: ExternType<'a>
+  FullName: string
+  IsStatic: bool
+  ReturnType: 'a option
+  TypeParameters: string[]
+  Parameters: UdonExternParameterInfo<'a>[]
+|}
 
 type UdonInfo<'Extern> = {
   Externs: (string * 'Extern[]) []
