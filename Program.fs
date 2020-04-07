@@ -15,8 +15,8 @@ let charCoder =
         if s.Length = 1 then Ok s.[0]
         else Error (DecoderError("not a char", FailMessage "not a char"))))
 
-let vrcsdk3Version = "2020.02.03.22.36"
-let udonsdkVersion = "2020.02.03.11.56"
+let vrcsdk3Version = "2020.04.03.13.19"
+let udonsdkVersion = vrcsdk3Version
 
 [<EntryPoint>]
 let main argv =
