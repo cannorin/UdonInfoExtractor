@@ -3,7 +3,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <UnityInstallRoot>D:\Unity</UnityInstallRoot>
-    <UnityVersion>2018.4.14f1</UnityVersion>
+    <UnityVersion>2018.4.20f1</UnityVersion>
     <UdonDir>$(MSBuildProjectDirectory)\Assets\Udon</UdonDir>
     <VRCSDKDir>$(MSBuildProjectDirectory)\Assets\VRCSDK</VRCSDKDir>
   </PropertyGroup>

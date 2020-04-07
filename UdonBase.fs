@@ -25,6 +25,7 @@ module ExternType =
     let inline InstanceVoidArgFunc x  = InstanceFunc (Array.empty, Some x)
 
     match name, argret with
+    | "ctor", [| [|ret|] |] when arity = 1 -> Constructor ([||], ret)
     | "ctor", [| xs; [|ret|] |] when xs.Length + 1 = arity -> Constructor (xs, ret)
     | _, [|[|"SystemVoid"|]|] ->
       if arity = 0 then StaticVoidRetArgFunc
@@ -78,6 +79,7 @@ type UdonExternParameterType<'a> =
   | In of 'a
   | Out of 'a
   | InOut of 'a
+  | Instance of 'a
   | TypeParameter of string
   | UsesUnknownType of UdonExternParameterType<UdonTypeInfo<'a>>
 

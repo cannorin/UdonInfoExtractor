@@ -20,10 +20,14 @@ let udonsdkVersion = "2020.02.03.11.56"
 
 [<EntryPoint>]
 let main argv =
-  let externs = Extern.createExternMap ()
+
   let types =
     let xs = UdonType.getAllSupported ()
     UdonType.createTyperMap xs
+
+  // let externs = Extern.createExternMap ()
+  let externs = GraphNode.createExternMap types
+
   let info = { Externs = externs; Types = types; VRCSDK3Version = vrcsdk3Version; UDONSDKVersion = udonsdkVersion }
 
   let encode x =
