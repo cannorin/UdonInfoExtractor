@@ -1,6 +1,16 @@
 UdonInfoExtractor
 =================
 
+# ARCHIVED!
+
+This tool has stopped working because of the internal changes of VRCSDK.
+
+I archived this repository because this kind of tool now has to be run inside Unity(\*1), and updating this tool to do that would require a lot of work.
+
+(\*1): VRC.Udon.EditorBindings.dll is now linked against Cinemachine, which is not available as a standalone DLL.
+
+-------
+
 This tool generates the following JSON files:
 
 - https://github.com/cannorin/UdonInfoExtractor/releases/latest/download/udon_externs.json
